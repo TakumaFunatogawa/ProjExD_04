@@ -9,6 +9,9 @@ import pygame as pg
 WIDTH = 1600  # ゲームウィンドウの幅
 HEIGHT = 900  # ゲームウィンドウの高さ
 
+all_sprites = pg.sprite.Group()
+neo_gravity = pg.sprite.Group()
+
 
 def check_bound(obj: pg.Rect) -> tuple[bool, bool]:
     """
@@ -249,6 +252,59 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
+class NeoGravity(pg.sprite.Sprite):
+    """
+    画面全体を覆う重力場を発生させるクラス
+    • 重力場：透明度のある黒い矩形（画面全体）
+    • 発動時間：400フレーム
+    • 効果：重力球の範囲内の爆弾を打ち落とす
+    • 発動条件：リターンキー押下，かつ，スコアが200より大
+    • 消費スコア：200
+    """
+    def __init__(self, screen: pg.Surface):
+        pg.sprite.Sprite.__init__(self)
+        self.screen = screen
+        self.color = (0, 0, 0)
+        self.rect = self.screen.get_rect()
+        self.alpha = 0
+        self.image = pg.Surface((self.rect.width, self.rect.height), pg.SRCALPHA)
+        self.image.fill((0, 0, 0, self.alpha))
+        self.frame_count = 0
+
+    def update(self):
+        self.alpha += 2
+        if self.alpha >= 255:
+            self.alpha = 255
+        self.image.fill((0, 0, 0, self.alpha))
+        
+        if self.frame_count < 400:
+            self.frame_count += 1
+        else:
+            for bomb in all_sprites:
+                if isinstance(bomb, Bomb):
+                    all_sprites.remove(bomb)
+
+    def draw(self):
+        if self.frame_count < 800:
+            self.screen.blit(self.image, (0, 0))
+
+
+class NeoGravity2(pg.sprite.Sprite):
+    def __init__(self, life: int):
+        self.image = pg.Surface(WIDTH, HEIGHT)
+        pg.draw.rect(self.image, (10, 10, 10), pg.Rect(0, 0, width, height))
+        self.image.get_colorkey((0, 0, 0))
+        self.image.get_alpha(200)
+        self.life = life
+        self.rect = self.image.get_rect()
+    
+    def update(self):
+        self.life -= 1
+        self.image = self.imgs[self.life//10%2]
+        if self.life < 0:
+            self.kill()
+    
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -260,9 +316,15 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    
+    all_sprites = pg.sprite.Group()
+    neo_gras = pg.sprite.Group()
+    
+    gravity = None
 
     tmr = 0
     clock = pg.time.Clock()
+    
     while True:
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
@@ -270,6 +332,16 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+            # if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
+            #     if score.score > 200:
+            #         gravity = NeoGravity(screen)
+            #         score.score -= 200
+            if event.type == pg.KEYDOWN and event.key == pg.K_RETURN: #and score.score > 200:
+                neo_gras.add = None
+                gravity = NeoGravity(screen)
+                all_sprites.add(gravity)
+                score.score -= 200
+            
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -296,6 +368,17 @@ def main():
             time.sleep(2)
             return
 
+        for bomb in pg.sprite.groupcollide(bombs, neo_gras, True, True).keys():
+            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+            score.score_up(1)  # 1点アップ
+        for emy in pg.sprite.groupcollide(emys, neo_gras, True, True).keys():
+            exps.add(Explosion(emy, 50))  # 爆発エフェクト
+            score.score_up(10)  # 1点アップ
+
+        if gravity is not None:
+            gravity.update()
+            gravity.draw()
+
         bird.update(key_lst, screen)
         beams.update()
         beams.draw(screen)
@@ -307,6 +390,9 @@ def main():
         exps.draw(screen)
         score.update(screen)
         pg.display.update()
+        # all_sprites.update()
+        # all_sprites.draw(screen)
+        
         tmr += 1
         clock.tick(50)
 
