@@ -2,6 +2,7 @@ import math
 import random
 import sys
 import time
+from typing import Any
 
 import pygame as pg
 
@@ -105,6 +106,29 @@ class Bird(pg.sprite.Sprite):
     def get_direction(self) -> tuple[int, int]:
         return self.dire
     
+
+class Shield(pg.sprite.Sprite): # 追加機能2
+    """
+    防御壁に関するクラス
+    """
+    def __init__(self, bird: Bird, life: int):
+        """
+        防御壁Surfaceを生成する
+        引数1 bird：こうかとん (Birdクラス)
+        引数2 life：発動時間 (int型)
+        """
+        super().__init__()
+        width = 20
+        height = bird.rect.height*2
+        self.image = pg.Surface((width, height))
+        self.rect = self.image.get_rect(center=bird.rect.center)
+        self.life = life
+        
+    def update(self):
+        self.life -= 1
+        if (self.life < 0):
+            self.kill()
+
 
 class Bomb(pg.sprite.Sprite):
     """
@@ -260,6 +284,7 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    shield = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -270,6 +295,10 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+            if event.type == pg.KEYDOWN and event.key == pg.K_CAPSLOCK:
+                # if (score.score >= 50):
+                    shield.add(Shield(bird, 400))
+                    score.score_up(-50)
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -289,6 +318,10 @@ def main():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.score_up(1)  # 1点アップ
 
+        for bomb in pg.sprite.groupcollide(bombs, shield, True, False).keys():
+            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+            score.score_up(1)  # 1点アップ
+
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
             bird.change_img(8, screen) # こうかとん悲しみエフェクト
             score.update(screen)
@@ -305,6 +338,8 @@ def main():
         bombs.draw(screen)
         exps.update()
         exps.draw(screen)
+        shield.update()
+        shield.draw(screen)
         score.update(screen)
         pg.display.update()
         tmr += 1
